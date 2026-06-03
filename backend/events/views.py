@@ -1,13 +1,14 @@
 import time
 import hashlib
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # Import our database model and serialization schemas
-from .models import Event
+from .models import Event, EventAttendee
 from .serializers import EventListSerializer, EventDetailSerializer, EventCreateSerializer
 
 class EventListView(APIView):
@@ -212,4 +213,92 @@ class OrganizerEventListView(APIView):
         
         # Return the serialized events list with a 200 OK status code
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class EventJoinToggleView(APIView):
+    """
+    EVENT JOIN TOGGLE API VIEW
+    
+    Analogy:
+    Think of this like a membership RSVP sheet.
+    If your name is not on the list, we write it down.
+    If your name is already on the list, we cross it off.
+    """
+    # Only authenticated users are allowed to RSVP to events
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        """
+        Handles incoming HTTP POST requests to toggle event attendance.
+        """
+        # Step 1: Fetch the event from the database. It must be published.
+        # If it doesn't exist or is not published, raise a 404 Not Found error.
+        event = get_object_or_404(Event, pk=pk, is_published=True)
+
+        # Step 2: Try to get the existing attendance record, or create a new one.
+        # attendee is the retrieved or created record.
+        # created is True if a new record was made, and False if it already existed.
+        attendee, created = EventAttendee.objects.get_or_create(
+            event=event, 
+            user=request.user
+        )
+
+        # Step 3: If created is False, the user is already attending, so they want to leave.
+        # We delete the registration record.
+        if not created:
+            attendee.delete()
+            # Return response indicating the user left, with the new attendee count
+            return Response(
+                {
+                    "message": "You have left this event.",
+                    "joined": False,
+                    "attendee_count": event.attendees.count()
+                },
+                status=status.HTTP_200_OK
+            )
+
+        # Step 4: If created is True, the user has newly joined the event.
+        # Return response confirming the join, with the new attendee count.
+        return Response(
+            {
+                "message": "You have joined this event!",
+                "joined": True,
+                "attendee_count": event.attendees.count()
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class EventAttendanceStatusView(APIView):
+    """
+    EVENT ATTENDANCE STATUS API VIEW
+    
+    Analogy:
+    Think of this like looking at the guest list before deciding to attend.
+    You check if your name is listed, and see how many others are going.
+    """
+    # Only authenticated users can check their RSVP status
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        """
+        Handles incoming HTTP GET requests to check attendance status and count.
+        """
+        # Step 1: Check if this user is already registered for this event
+        is_joined = EventAttendee.objects.filter(
+            event_id=pk, 
+            user=request.user
+        ).exists()
+
+        # Step 2: Count the total number of users signed up for this event
+        attendee_count = Event.objects.get(pk=pk).attendees.count()
+
+        # Step 3: Return the results to the client
+        return Response(
+            {
+                "joined": is_joined,
+                "attendee_count": attendee_count
+            },
+            status=status.HTTP_200_OK
+        )
 
