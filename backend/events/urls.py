@@ -7,7 +7,9 @@ from .views import (
     CloudinaryEventSignatureView, 
     OrganizerEventListView,
     EventJoinToggleView,
-    EventAttendanceStatusView
+    EventAttendanceStatusView,
+    OrganizerEventDetailView,
+    OrganizerStatsView
 )
 
 urlpatterns = [
@@ -39,5 +41,16 @@ urlpatterns = [
     # Route for listing all events created by the logged-in organizer.
     # Handles GET requests at: /api/events/my-events/
     path('my-events/', OrganizerEventListView.as_view(), name='organizer-events'),
+
+    # Route for fetching dashboard statistics for the logged-in organizer.
+    # Handles GET requests at: /api/events/my-stats/
+    path('my-stats/', OrganizerStatsView.as_view(), name='organizer-stats'),
+
+    # Route for fetching, updating, or deleting an existing event owned by the logged-in organizer.
+    # Handles GET, PUT, and DELETE requests at: /api/events/<id>/update/ (e.g. /api/events/1/update/)
+    path('<int:pk>/update/', OrganizerEventDetailView.as_view(), name='event-update'),
 ]
+
+
+
 

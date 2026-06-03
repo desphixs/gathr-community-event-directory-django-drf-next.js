@@ -302,3 +302,175 @@ class EventAttendanceStatusView(APIView):
             status=status.HTTP_200_OK
         )
 
+
+class OrganizerEventDetailView(APIView):
+    """
+    ORGANIZER EVENT DETAIL, UPDATE, AND DELETE API VIEW
+    
+    Analogy:
+    Think of this like an event organizer returning to the community center to manage their flyer.
+    The clerk checks their ID card (IsAuthenticated) to make sure they are the actual owner.
+    - If the owner wants to inspect the details, the clerk shows them the full flyer (GET).
+    - If the owner wants to change the details, they write the updated info on the form (PUT),
+      the clerk validates it, updates the flyer on the board, and saves it.
+    - If the owner wants to completely remove the flyer, the clerk takes it down and shreds it (DELETE).
+    """
+    # Only authenticated users can manage their own events
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        """
+        Handles HTTP GET requests to fetch the current event details for editing.
+        Only the organizer who created the event can access this.
+        """
+        # Step 1: Fetch the event from the database using its primary key (pk).
+        event = get_object_or_404(Event, pk=pk)
+
+        # Step 2: Verify that the requesting user is the organizer of the event.
+        # If not, return a 403 Forbidden status code.
+        if event.organizer != request.user:
+            return Response(
+                {"detail": "You do not have permission to view this event."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Step 3: Serialize the event details using EventDetailSerializer to send to the editor form.
+        serializer = EventDetailSerializer(event)
+
+        # Step 4: Return the serialized data with a 200 OK response.
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        """
+        Handles HTTP PUT requests to completely update the event flyer details.
+        Only the organizer who created the event can save updates.
+        """
+        # Step 1: Fetch the event from the database using its primary key (pk).
+        event = get_object_or_404(Event, pk=pk)
+
+        # Step 2: Verify that the requesting user is the organizer of the event.
+        # If not, return a 403 Forbidden status code.
+        if event.organizer != request.user:
+            return Response(
+                {"detail": "You do not have permission to update this event."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Step 3: Pass the incoming request payload data to EventCreateSerializer for verification.
+        # We specify partial=True so that if the organizer only edits a few fields, the other fields remain valid.
+        serializer = EventCreateSerializer(data=request.data, partial=True)
+
+        # Step 4: Run validation checks on the serializer inputs.
+        # If validation fails, it automatically returns a 400 Bad Request error response.
+        serializer.is_valid(raise_exception=True)
+
+        # Step 5: Update the event fields one-by-one manually in our view code,
+        # using the validated data if provided, or keeping the existing values as fallbacks.
+        # This keeps the database write side-effects transparent and explicit for students.
+        # If a field is present in the validated data, we update it; otherwise, we keep the original.
+        event.title = serializer.validated_data.get('title', event.title)
+        event.description = serializer.validated_data.get('description', event.description)
+        event.location = serializer.validated_data.get('location', event.location)
+        event.date = serializer.validated_data.get('date', event.date)
+        event.banner_url = serializer.validated_data.get('banner_url', event.banner_url)
+        event.is_published = serializer.validated_data.get('is_published', event.is_published)
+
+        # Step 6: Save the modified event object back to the database.
+        event.save()
+
+        # Step 7: Serialize the updated event object to send it back to the client.
+        serializer_out = EventDetailSerializer(event)
+
+        # Step 8: Return the updated serialized data with a 200 OK status code.
+        return Response(serializer_out.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        """
+        Handles HTTP DELETE requests to remove an event from the database.
+        Only the organizer who created the event can delete it.
+        """
+        # Step 1: Fetch the event from the database using its primary key (pk).
+        event = get_object_or_404(Event, pk=pk)
+
+        # Step 2: Verify that the requesting user is the organizer of the event.
+        # If not, return a 403 Forbidden status code.
+        if event.organizer != request.user:
+            return Response(
+                {"detail": "You do not have permission to delete this event."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Step 3: Delete the event record from the database.
+        event.delete()
+
+        # Step 4: Return a confirmation response with a 204 No Content status code.
+        return Response(
+            {"message": "Event deleted successfully."}, 
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+class OrganizerStatsView(APIView):
+    """
+    ORGANIZER STATS API VIEW
+    
+    Analogy:
+    Think of this like a report card or scoreboard dashboard.
+    An event organizer wants to see a summary of their achievements, like:
+    - How many total flyers (events) they have put up.
+    - How many total guests (attendees) have signed up across all flyers.
+    - How many flyers are currently visible/published vs how many are drafts.
+    - A snapshot of their latest created flyer.
+    We retrieve these stats from different drawer compartments in the database and present them as a single clean report card.
+    """
+    # Only logged-in and authenticated organizers can request their dashboard stats
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Handles incoming HTTP GET requests to fetch organizer stats.
+        """
+        # Step 1: Count the total number of events created by this organizer.
+        # Event.objects.filter(organizer=request.user) filters events by the logged-in user.
+        # .count() calculates the total rows in the database matching this query.
+        total_events = Event.objects.filter(organizer=request.user).count()
+
+        # Step 2: Count the total number of attendee registrations across all events owned by this organizer.
+        # We query the EventAttendee table and filter by attendees whose event's organizer is the logged-in user.
+        # event__organizer matches the organizer foreign key relation on the Event model.
+        total_attendees = EventAttendee.objects.filter(event__organizer=request.user).count()
+
+        # Step 3: Count the number of published events (events that are live and visible to the public).
+        published_events = Event.objects.filter(organizer=request.user, is_published=True).count()
+
+        # Step 4: Count the number of draft events (events that are created but hidden from the public).
+        draft_events = Event.objects.filter(organizer=request.user, is_published=False).count()
+
+        # Step 5: Retrieve the single most recently created event by this organizer.
+        # We filter by the organizer, sort by created_at in descending order (newest first) using '-created_at',
+        # and grab the first item from the list using .first().
+        latest_event_obj = Event.objects.filter(organizer=request.user).order_by('-created_at').first()
+
+        # Step 6: If the organizer has created at least one event, serialize it.
+        # Otherwise, set the latest event field to None.
+        if latest_event_obj:
+            # We use EventListSerializer to translate the event object to a JSON dictionary.
+            latest_event = EventListSerializer(latest_event_obj).data
+        else:
+            latest_event = None
+
+        # Step 7: Pack all these stats into a response dictionary and send it to the client.
+        return Response(
+            {
+                "total_events": total_events,
+                "total_attendees": total_attendees,
+                "published_events": published_events,
+                "draft_events": draft_events,
+                "latest_event": latest_event
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+
+
