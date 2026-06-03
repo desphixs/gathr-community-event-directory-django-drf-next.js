@@ -286,3 +286,110 @@ export async function getAttendanceStatusAction(eventId: number) {
         };
     }
 }
+
+
+/**
+ * GET ORGANIZER EVENT DETAIL ACTION
+ * 
+ * Analogy:
+ * Think of this like an organizer requesting to view their private event folder.
+ * This checks that they own the event before displaying draft or sensitive data.
+ */
+export async function getOrganizerEventDetailAction(id: number) {
+    try {
+        // Send a GET request to the organizer update endpoint to fetch details
+        const { ok, data } = await apiFetch(`/events/${id}/update/`, {
+            method: 'GET',
+            cache: 'no-store',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                event: data,
+            };
+        } else {
+            return {
+                success: false,
+                event: null,
+                message: data.detail || data.message || "Failed to retrieve organizer event details.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            event: null,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
+/**
+ * UPDATE ORGANIZER EVENT ACTION
+ * 
+ * Analogy:
+ * Think of this like submitting a request to modify a flyer.
+ * We pass the updated fields to Django via a PUT request on the update endpoint.
+ */
+export async function updateOrganizerEventAction(id: number, payload: object) {
+    try {
+        // Send a PUT request with the updated details payload
+        const { ok, data } = await apiFetch(`/events/${id}/update/`, {
+            method: 'PUT',
+            body: payload,
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                event: data,
+            };
+        } else {
+            return {
+                success: false,
+                event: null,
+                message: data.detail || data.message || "Failed to update event details.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            event: null,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
+/**
+ * DELETE ORGANIZER EVENT ACTION
+ * 
+ * Analogy:
+ * Think of this like request to permanently shred an event flyer.
+ * We dispatch a DELETE request to our consolidated endpoint.
+ */
+export async function deleteOrganizerEventAction(id: number) {
+    try {
+        // Send a DELETE request to erase the event
+        const { ok, data } = await apiFetch(`/events/${id}/update/`, {
+            method: 'DELETE',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                message: data.message || "Event deleted successfully.",
+            };
+        } else {
+            return {
+                success: false,
+                message: data.detail || data.message || "Failed to delete event.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+

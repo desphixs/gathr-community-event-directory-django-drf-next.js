@@ -7,11 +7,11 @@ import Link from "next/link";
 // Import Next.js router hook to programmatically navigate
 import { useRouter } from "next/navigation";
 // Import Lucide React icons for a beautiful, modern UI
-import { Loader2, Calendar, MapPin, Users, Plus, AlertCircle, ExternalLink, CalendarDays } from "lucide-react";
+import { Loader2, Calendar, MapPin, Users, Plus, AlertCircle, ExternalLink, CalendarDays, Pencil, Trash2 } from "lucide-react";
 // Import the DashboardWrapper component which renders the responsive sidebar layout
 import DashboardWrapper from "@/components/dashboard/DashboardWrapper";
-// Import our server action to fetch events created by this specific organizer
-import { getMyEventsAction } from "@/app/actions/events/events";
+// Import our server action to fetch and delete events created by this specific organizer
+import { getMyEventsAction, deleteOrganizerEventAction } from "@/app/actions/events/events";
 
 // Define the Event type to keep our TypeScript compiler happy and ensure clean type definitions
 interface Event {
@@ -43,6 +43,35 @@ export default function OrganizerEventsPage() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Track which event is currently prompting a delete confirmation
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+    // Track loading state during event deletion API requests
+    const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+
+    // Handler function to call the delete event server action
+    const handleDeleteEvent = async (eventId: number) => {
+        try {
+            setDeleteLoading(true);
+            setError(null);
+
+            // Execute the server action to delete the event from the database
+            const result = await deleteOrganizerEventAction(eventId);
+
+            if (result.success) {
+                // If successful, filter out the deleted event from local state to update the UI
+                setEvents((prev) => prev.filter((e) => e.id !== eventId));
+                // Clear the deleting ID state to close the prompt
+                setDeletingId(null);
+            } else {
+                setError(result.message || "Failed to delete the event.");
+            }
+        } catch (err: any) {
+            setError(err.message || "An unexpected error occurred while deleting.");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
 
     // Load events created by this organizer when the page mounts
     useEffect(() => {
@@ -170,12 +199,61 @@ export default function OrganizerEventsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Actions footer wrapper card */}
-                                    <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center justify-between gap-3 shrink-0">
-                                        <Link href={`/events/${event.id}`} target="_blank" className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex-grow text-center">
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                            View Public Event
-                                        </Link>
+                                    {/* Actions footer wrapper card containing view, edit, and delete triggers */}
+                                    <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex flex-col gap-3 shrink-0">
+                                        <div className="flex items-center justify-between gap-3 w-full">
+                                            {/* Button to view the public details page for this event in a new tab */}
+                                            <Link href={`/events/${event.id}`} target="_blank" className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-zinc-50 dark:bg-zinc-850 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 text-zinc-700 dark:text-zinc-300 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex-grow text-center">
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                View Public Event
+                                            </Link>
+                                            
+                                            {/* Button to navigate to the edit form page for this event (Icon Only) */}
+                                            <Link href={`/dashboard/events/${event.id}/edit`} title="Edit Event" className="inline-flex items-center justify-center w-10 h-10 bg-white hover:bg-zinc-50 dark:bg-zinc-850 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 text-violet-650 dark:text-violet-400 rounded-xl transition-all cursor-pointer shrink-0">
+                                                <Pencil className="w-4 h-4" />
+                                            </Link>
+                                            
+                                            {/* Button to open the inline delete confirmation prompt (Icon Only) */}
+                                            <button 
+                                                onClick={() => setDeletingId(event.id)}
+                                                title="Delete Event"
+                                                className="inline-flex items-center justify-center w-10 h-10 bg-red-50 hover:bg-red-100/80 dark:bg-red-950/20 dark:hover:bg-red-950/40 border border-red-200/50 dark:border-red-900/30 text-red-650 dark:text-red-400 rounded-xl transition-all cursor-pointer shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Inline Delete Confirmation Alert Banner */}
+                                        {deletingId === event.id && (
+                                            <div className="p-3.5 bg-red-50 dark:bg-red-950/25 border border-red-100 dark:border-red-900/30 rounded-2xl flex flex-col gap-2 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <p className="text-[11px] font-bold text-red-800 dark:text-red-300 text-center">Are you sure? This action cannot be undone.</p>
+                                                <div className="flex gap-2">
+                                                    {/* Button to confirm deletion and dispatch the API request */}
+                                                    <button 
+                                                        disabled={deleteLoading}
+                                                        onClick={() => handleDeleteEvent(event.id)}
+                                                        className="flex-grow py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 disabled:opacity-60"
+                                                    >
+                                                        {deleteLoading ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                                Deleting...
+                                                            </>
+                                                        ) : (
+                                                            'Yes, Delete'
+                                                        )}
+                                                    </button>
+                                                    {/* Button to cancel deletion and close the prompt */}
+                                                    <button 
+                                                        disabled={deleteLoading}
+                                                        onClick={() => setDeletingId(null)}
+                                                        className="flex-grow py-2 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-bold transition-all cursor-pointer disabled:opacity-60"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
