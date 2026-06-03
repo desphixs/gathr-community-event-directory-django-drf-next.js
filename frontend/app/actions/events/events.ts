@@ -393,3 +393,48 @@ export async function deleteOrganizerEventAction(id: number) {
     }
 }
 
+/**
+ * GET ORGANIZER DASHBOARD STATS ACTION
+ * 
+ * Analogy:
+ * Think of this like asking the accountant for a financial and attendance summary report.
+ * We tell the accountant (Django) our name (token), and he calculates the total numbers of events,
+ * attendee registrations, drafts, and pulls details of the most recent event created.
+ */
+export async function getOrganizerStatsAction() {
+    try {
+        // Send a GET request to the Django stats endpoint
+        // cache: 'no-store' ensures we always fetch the newest statistics rather than a cached copy
+        const { ok, data } = await apiFetch('/events/my-stats/', {
+            method: 'GET',
+            cache: 'no-store',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                stats: {
+                    totalEvents: data.total_events,
+                    totalAttendees: data.total_attendees,
+                    publishedEvents: data.published_events,
+                    draftEvents: data.draft_events,
+                    latestEvent: data.latest_event,
+                },
+            };
+        } else {
+            return {
+                success: false,
+                stats: null,
+                message: data.detail || data.message || "Failed to retrieve dashboard statistics.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            stats: null,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
+
