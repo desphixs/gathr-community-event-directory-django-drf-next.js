@@ -58,6 +58,9 @@ INSTALLED_APPS = [
     # Register our custom authentication application to handle email logins!
     'userauths',
 
+    # Register our custom events application to handle community meetups!
+    'events',
+
     # Handles sending emails through external providers like Resend
     'anymail',
 ]
