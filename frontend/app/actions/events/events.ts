@@ -168,3 +168,41 @@ export async function createEventAction(payload: object) {
     }
 }
 
+/**
+ * GET MY EVENTS LIST ACTION
+ * 
+ * Analogy:
+ * Think of this like a messenger asking for folders in a private cabinet.
+ * The messenger carries the user's login session cookies (via apiFetch) and requests
+ * the private `/events/my-events/` list. Django validates their identity and returns
+ * only the event cards created by this specific user.
+ */
+export async function getMyEventsAction() {
+    try {
+        const { ok, data } = await apiFetch('/events/my-events/', {
+            method: 'GET',
+            cache: 'no-store',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                events: data,
+            };
+        } else {
+            return {
+                success: false,
+                events: [],
+                message: data.message || "Failed to retrieve your events.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            events: [],
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
+

@@ -1,6 +1,6 @@
 from django.urls import path
 # Import our view handlers from the views.py file in the current directory
-from .views import EventListView, EventDetailView, EventCreateView, CloudinaryEventSignatureView
+from .views import EventListView, EventDetailView, EventCreateView, CloudinaryEventSignatureView, OrganizerEventListView
 
 urlpatterns = [
     # Route for listing all events or searching/filtering them.
@@ -19,5 +19,9 @@ urlpatterns = [
     # Route for generating a secure Cloudinary image upload signature.
     # Handles GET requests at: /api/events/cloudinary/signature/
     path('cloudinary/signature/', CloudinaryEventSignatureView.as_view(), name='event-cloudinary-signature'),
+
+    # Route for listing all events created by the logged-in organizer.
+    # Handles GET requests at: /api/events/my-events/
+    path('my-events/', OrganizerEventListView.as_view(), name='organizer-events'),
 ]
 

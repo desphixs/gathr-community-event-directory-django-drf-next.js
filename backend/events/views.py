@@ -184,3 +184,32 @@ class CloudinaryEventSignatureView(APIView):
             'cloud_name': settings.CLOUDINARY_CLOUD_NAME,
             'folder': folder_name
         }, status=status.HTTP_200_OK)
+
+
+class OrganizerEventListView(APIView):
+    """
+    ORGANIZER EVENT LIST API VIEW
+    
+    Analogy:
+    Think of this like a private folder in a filing cabinet.
+    Only the logged-in organizer has the key to this folder (IsAuthenticated).
+    When they open it, they only see the events they created, sorted by when they were added.
+    """
+    # Only authenticated users can see their private event list
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Handles incoming HTTP GET requests to list all events created by the logged-in user.
+        """
+        # Fetch only the events created by the current request user
+        # prefetch_related('attendees') pre-loads the attendees list so we don't hit the database repeatedly when counting
+        # order_by('-created_at') ensures the most recently created events appear at the top
+        events = Event.objects.filter(organizer=request.user).prefetch_related('attendees').order_by('-created_at')
+        
+        # Translate the database events queryset into a list of JSON-serializable dictionaries
+        serializer = EventListSerializer(events, many=True)
+        
+        # Return the serialized events list with a 200 OK status code
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
