@@ -206,3 +206,83 @@ export async function getMyEventsAction() {
 }
 
 
+/**
+ * JOIN EVENT ACTION
+ * 
+ * Analogy:
+ * Think of this server action like a clerk submitting an RSVP card to the registration office.
+ * When the user clicks the RSVP button, this function dispatches a POST request to the toggle endpoint.
+ * The backend either writes the user's name down (Join) or erases it (Leave) and returns the updated status.
+ */
+export async function joinEventAction(eventId: number) {
+    try {
+        // Send a POST request to the join toggle endpoint
+        const { ok, data } = await apiFetch(`/events/${eventId}/join/`, {
+            method: 'POST',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                message: data.message,
+                joined: data.joined,
+                attendeeCount: data.attendee_count,
+            };
+        } else {
+            return {
+                success: false,
+                message: data.message || "Failed to update attendance.",
+                joined: false,
+                attendeeCount: 0,
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+            joined: false,
+            attendeeCount: 0,
+        };
+    }
+}
+
+/**
+ * GET ATTENDANCE STATUS ACTION
+ * 
+ * Analogy:
+ * Think of this like asking the security desk to check the guest list.
+ * We want to know: "Am I already registered for this event?" and "How many other people are going?"
+ * The desk responds with a simple yes/no and the total attendee count.
+ */
+export async function getAttendanceStatusAction(eventId: number) {
+    try {
+        // Send a GET request to retrieve the user's attendance status and the attendee count
+        // cache: 'no-store' ensures we always fetch the newest value instead of loading cached data
+        const { ok, data } = await apiFetch(`/events/${eventId}/status/`, {
+            method: 'GET',
+            cache: 'no-store',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                joined: data.joined,
+                attendeeCount: data.attendee_count,
+            };
+        } else {
+            return {
+                success: false,
+                joined: false,
+                attendeeCount: 0,
+                message: data.message || "Failed to retrieve attendance status.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            joined: false,
+            attendeeCount: 0,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
