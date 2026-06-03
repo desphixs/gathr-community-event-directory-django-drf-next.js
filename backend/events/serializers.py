@@ -74,3 +74,51 @@ class EventDetailSerializer(EventListSerializer):
         # We extend the fields list to include the long event description
         fields = EventListSerializer.Meta.fields + ['description']
         read_only_fields = fields
+
+
+class EventCreateSerializer(serializers.ModelSerializer):
+    """
+    EVENT CREATE SERIALIZER
+    
+    Analogy:
+    Think of this serializer like a membership application form.
+    When someone wants to create a new event, they fill out certain fields.
+    This form checks that they typed everything correctly (like making sure the title
+    isn't too long, and that the date is a valid calendar date and time) before we
+    actually save the event to the database!
+    """
+
+    # The title of the meetup flyer, limited to 200 characters.
+    title = serializers.CharField(max_length=200)
+
+    # The long story or description explaining what the meetup is.
+    description = serializers.CharField()
+
+    # The city or venue where people will gather.
+    location = serializers.CharField(max_length=255)
+
+    # The exact date and time the meetup starts.
+    date = serializers.DateTimeField()
+
+    # An optional website link/URL to the uploaded banner image.
+    # It defaults to an empty string, is not required, and can be blank.
+    banner_url = serializers.URLField(required=False, allow_blank=True, default='')
+
+    # A checkmark box showing if the event is published (public) or draft.
+    # It defaults to True so it is visible immediately.
+    is_published = serializers.BooleanField(default=True, required=False)
+
+    class Meta:
+        # Link this form to the Event database model
+        model = Event
+
+        # Define the exact list of attributes we accept from the user
+        fields = [
+            'title',
+            'description',
+            'location',
+            'date',
+            'banner_url',
+            'is_published'
+        ]
+

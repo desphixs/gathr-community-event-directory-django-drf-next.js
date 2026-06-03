@@ -1,11 +1,14 @@
+import time
+import hashlib
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # Import our database model and serialization schemas
 from .models import Event
-from .serializers import EventListSerializer, EventDetailSerializer
+from .serializers import EventListSerializer, EventDetailSerializer, EventCreateSerializer
 
 class EventListView(APIView):
     """
@@ -87,3 +90,97 @@ class EventDetailView(APIView):
                 {"message": "Event not found."}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class EventCreateView(APIView):
+    """
+    CREATE EVENT VIEW
+    
+    Analogy:
+    Think of this like an office at a community center where you go to submit a flyer.
+    The clerk checks your ID card to make sure you are logged in (IsAuthenticated).
+    Then they check the flyer details using the EventCreateSerializer form to make sure
+    nothing is missing or incorrect. If everything looks good, they stamp the organizer's
+    name on it and post it on the community wall (saving to the database).
+    Finally, they give you a clean copy of the posted flyer as confirmation.
+    """
+    # Only logged-in users are allowed to create events
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Handles incoming HTTP POST requests to create a new event flyer.
+        """
+        # Step 1: Pass the incoming request form data to our EventCreateSerializer validator
+        serializer = EventCreateSerializer(data=request.data)
+        
+        # Step 2: Validate the incoming fields. If anything is wrong, raise_exception=True
+        # automatically returns a 400 Bad Request error response detailing the incorrect fields.
+        serializer.is_valid(raise_exception=True)
+        
+        # Step 3: Explicitly create the event row in the database.
+        # We assign the current request user as the organizer and fill in the rest of the validated form fields.
+        event = Event.objects.create(
+            organizer=request.user, 
+            **serializer.validated_data
+        )
+        
+        # Step 4: Serialize the newly created Event record using our detailed view layout
+        serializer_out = EventDetailSerializer(event)
+        
+        # Return the serialized data representing the created event with a 201 Created status code.
+        return Response(serializer_out.data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        """
+        Handles incoming HTTP GET requests for this view (mainly to keep it browsable in the browser).
+        """
+        # Return a simple guide message instructing users to send a POST request instead.
+        return Response(
+            {"message": "Send a POST request to create an event."}, 
+            status=status.HTTP_200_OK
+        )
+
+
+class CloudinaryEventSignatureView(APIView):
+    """
+    CLOUDINARY EVENT SIGNATURE VIEW
+    
+    Analogy:
+    Think of this view like a security booth that issues temporary cryptographically-sealed visitor passes.
+    Before uploading a large flyer banner directly to Cloudinary (our remote media storage),
+    the user asks us for a digital permit signature.
+    We create a timestamp, specify the exact folder path, sign the parameters using our secret key,
+    and return it. The user's browser takes this digital permit and uploads the image directly to Cloudinary,
+    so our main backend server doesn't get slowed down by handling heavy binary image files!
+    """
+    # Only authenticated users are allowed to generate media upload permits
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Generates a secure cryptographic signature allowing direct upload to Cloudinary.
+        """
+        # Grab the current Unix time as a numeric timestamp integer
+        timestamp = int(time.time())
+        
+        # Specify the target Cloudinary folder name for event banners
+        folder_name = 'gathr_banners'
+        
+        # Construct the key-value signature payload parameter string
+        params_to_sign = f"folder={folder_name}&timestamp={timestamp}"
+        
+        # Hash the parameter string and our secret key together using SHA-1
+        # and represent the result as a hexadecimal string signature permit.
+        signature = hashlib.sha1(
+            f"{params_to_sign}{settings.CLOUDINARY_API_SECRET}".encode()
+        ).hexdigest()
+        
+        # Return the Cloudinary parameters needed by the frontend client
+        return Response({
+            'signature': signature,
+            'timestamp': timestamp,
+            'api_key': settings.CLOUDINARY_API_KEY,
+            'cloud_name': settings.CLOUDINARY_CLOUD_NAME,
+            'folder': folder_name
+        }, status=status.HTTP_200_OK)
