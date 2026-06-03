@@ -1,6 +1,4 @@
 import React from "react";
-// Import the Shield icon from Lucide React to act as our modern security symbol logo.
-import { Shield } from "lucide-react";
 import Link from "next/link";
 
 /**
@@ -8,14 +6,22 @@ import Link from "next/link";
  *
  * Analogy:
  * Think of this like the main metal seal placed at the entrance of our hotel lobby.
- * It houses the Shield symbol inside a dark aesthetic square, and links guests back
+ * It houses the Calendar symbol inside, and links guests back
  * to the landing homepage whenever clicked.
  */
 export default function Logo() {
     return (
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/" className="flex items-center gap-2.5 group">
+            {/* Brand Logo Image from Flaticon */}
+            <img 
+                src="https://cdn-icons-png.flaticon.com/128/12519/12519597.png" 
+                alt="Gathr Logo" 
+                className="w-8 h-8 object-contain transition-transform duration-300 group-hover:scale-105" 
+            />
             {/* Brand title text with tight tracking and bold design */}
-            <span className="text-xl font-bold tracking-tight text-black dark:text-white">AuthForge</span>
+            <span className="text-xl font-black tracking-tight text-zinc-900 dark:text-white">
+                Gathr
+            </span>
         </Link>
     );
 }
