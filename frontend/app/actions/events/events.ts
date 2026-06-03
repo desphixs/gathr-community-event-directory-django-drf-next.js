@@ -95,3 +95,76 @@ export async function getEventDetailAction(id: number) {
         };
     }
 }
+
+/**
+ * GET EVENT CLOUDINARY UPLOAD SIGNATURE
+ * 
+ * Analogy:
+ * Think of this like asking the hotel desk clerk for a secure ticket/voucher.
+ * We call Django's signature endpoint, and Django gives us back signature details
+ * so the frontend can upload the banner image directly to Cloudinary.
+ */
+export async function getEventCloudinarySignatureAction() {
+    try {
+        const { ok, data } = await apiFetch('/events/cloudinary/signature/', {
+            method: 'GET',
+            cache: 'no-store',
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                signatureData: data,
+            };
+        } else {
+            return {
+                success: false,
+                signatureData: null,
+                message: data.message || "Failed to retrieve upload signature.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            signatureData: null,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
+/**
+ * CREATE EVENT ACTION
+ * 
+ * Analogy:
+ * Think of this like submitting the final filled-out event flyer form to the community desk.
+ * We pass the payload (including the title, description, location, date, and Cloudinary banner URL)
+ * to save it permanently in the Django database.
+ */
+export async function createEventAction(payload: object) {
+    try {
+        const { ok, data } = await apiFetch('/events/create/', {
+            method: 'POST',
+            body: payload,
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                event: data,
+            };
+        } else {
+            return {
+                success: false,
+                event: null,
+                message: data.message || "Failed to create event. Please verify all fields.",
+            };
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            event: null,
+            message: `Network error: ${error.message || 'Failed to connect to backend server.'}`,
+        };
+    }
+}
+
